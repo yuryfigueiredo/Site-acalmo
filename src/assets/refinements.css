@@ -73,3 +73,10 @@
 /* As migalhas ficam no polegar: o texto continua pequeno, o alvo chega a 44px. */
 .breadcrumbs a{padding:14px 8px;margin-inline:-8px}
 .breadcrumbs{margin-bottom:-8px}
+
+/* Ruídos contínuos: três interruptores discretos, sem o peso de um card inteiro. */
+.noise-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:18px}
+.noise-row .small-label{margin-top:0;padding-right:6px}
+.noise-toggle{min-height:44px;padding:10px 20px;border:1px solid var(--line);border-radius:30px;background:var(--card);color:var(--body);font-size:13px}
+.noise-toggle:hover{border-color:var(--green)}
+.noise-toggle.selected{background:var(--green);border-color:var(--green);color:var(--button-text)}

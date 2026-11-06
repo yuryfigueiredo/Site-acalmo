@@ -3,7 +3,8 @@
  * Create an instance freely; call set/resume from an explicit user gesture.
  * tryAutoplay only uses playback already permitted by the browser.
  */
-const NAMES = new Set(['rain', 'ocean', 'forest', 'fire']);
+export const soundChannels = ['rain', 'ocean', 'forest', 'fire', 'brown', 'white', 'pink'];
+const NAMES = new Set(soundChannels);
 const FADE = 0.12;
 
 export default class AmbientAudio {
@@ -225,10 +226,22 @@ export default class AmbientAudio {
     for (let channel = 0; channel < 2; channel++) {
       const data = buffer.getChannelData(channel);
       let low = 0;
+      // Kellet's coefficients approximate the -3 dB/octave slope of pink noise.
+      let p0 = 0, p1 = 0, p2 = 0, p3 = 0, p4 = 0, p5 = 0, p6 = 0;
       for (let i = 0; i < size; i++) {
         const white = Math.random() * 2 - 1;
         low = (low + 0.02 * white) / 1.02;
-        data[i] = kind === 'brown' ? low * 3.2 : white * 0.55;
+        if (kind === 'brown') data[i] = low * 3.2;
+        else if (kind === 'pink') {
+          p0 = 0.99886 * p0 + white * 0.0555179;
+          p1 = 0.99332 * p1 + white * 0.0750759;
+          p2 = 0.96900 * p2 + white * 0.1538520;
+          p3 = 0.86650 * p3 + white * 0.3104856;
+          p4 = 0.55000 * p4 + white * 0.5329522;
+          p5 = -0.7616 * p5 - white * 0.0168980;
+          data[i] = (p0 + p1 + p2 + p3 + p4 + p5 + p6 + white * 0.5362) * 0.11;
+          p6 = white * 0.115926;
+        } else data[i] = white * 0.55;
       }
       // Match loop endpoints without introducing a hard seam.
       const seam = Math.min(2048, size / 2);
@@ -299,13 +312,19 @@ export default class AmbientAudio {
         this._tone(channel, pitch, 0.3, 0.06, 'sine', 400);
         this._tone(channel, pitch * 1.18, 0.16, 0.035, 'sine', -250, 0.22);
       });
-    } else {
+    } else if (name === 'fire') {
       const warmth = this._noise(channel, 'brown', this._filter(channel, 'lowpass', 600), 1.15);
       this._lfo(channel, 0.23, 0.22, warmth.gain.gain);
       this._noise(channel, 'white', this._filter(channel, 'lowpass', 950), 0.18);
       this._every(channel, 260, () => {
         if (Math.random() < 0.4) this._crackle(channel);
       });
+    } else if (name === 'brown') {
+      this._noise(channel, 'brown', this._filter(channel, 'lowpass', 900), 1.1);
+    } else if (name === 'white') {
+      this._noise(channel, 'white', this._filter(channel, 'lowpass', 9000), 0.42);
+    } else {
+      this._noise(channel, 'pink', this._filter(channel, 'highpass', 45), 0.9, this._filter(channel, 'lowpass', 11000));
     }
     return channel;
   }

@@ -51,6 +51,47 @@ export function createBreathPlan(selection = 'cycles5', withHold = false) {
   return { steps, cycles: count, duration: target || at, withHold };
 }
 
+export const breathPatterns = {
+  '4-7-8': { label: 'Respiração 4-7-8', cycles: 4, phases: [['in', 4000, 'Inspire pelo nariz'], ['hold', 7000, 'Segure o ar'], ['out', 8000, 'Solte pela boca']] },
+  quadrada: { label: 'Respiração quadrada', cycles: 4, phases: [['in', 4000, 'Inspire'], ['hold', 4000, 'Segure o ar'], ['out', 4000, 'Solte o ar'], ['hold-empty', 4000, 'Segure sem ar']] },
+  coerente: { label: 'Respiração coerente', cycles: 6, phases: [['in', 5500, 'Inspire'], ['out', 5500, 'Solte o ar']] }
+};
+
+export function createNamedPlan(id, cyclesOverride) {
+  const pattern = breathPatterns[id];
+  if (!pattern) throw new Error('Este padrão de respiração não está disponível.');
+  const cycles = Math.max(1, Math.min(20, Math.round(cyclesOverride || pattern.cycles)));
+  const steps = [];
+  let at = 0;
+  for (let cycle = 1; cycle <= cycles; cycle++) {
+    for (const [type, ms, label] of pattern.phases) {
+      steps.push({ type, label, ms, cycle, at, end: at + ms });
+      at += ms;
+    }
+  }
+  return { steps, cycles, duration: at, pattern: id };
+}
+
+// "rain:40,ocean:35" — percentuais inteiros; nomes fora da lista e valores inválidos são ignorados.
+export function parseMix(raw, allowed) {
+  if (typeof raw !== 'string' || !raw) return null;
+  const names = new Set(allowed);
+  const mix = {};
+  for (const part of raw.split(',').slice(0, 12)) {
+    const [name, value] = part.split(':');
+    if (!names.has(name)) continue;
+    const percent = Number(value);
+    if (!Number.isInteger(percent) || percent < 1 || percent > 100) continue;
+    mix[name] = percent / 100;
+  }
+  return Object.keys(mix).length ? mix : null;
+}
+
+export function mixParam(volumes) {
+  const parts = Object.entries(volumes).filter(([, value]) => value > 0).map(([name, value]) => `${name}:${Math.round(value * 100)}`);
+  return parts.length ? parts.join(',') : null;
+}
+
 export function breathAt(plan, elapsed) {
   const time = Math.max(0, elapsed);
   if (time >= plan.duration - 0.01) return { complete: true };

@@ -1,6 +1,6 @@
 import AmbientAudio from './audio.js';
 import { config } from './config.js';
-import { createBreathPlan, breathAt, formatClock, dailyQuote, makeStore, affiliateUrl } from './core.js';
+import { createBreathPlan, createNamedPlan, breathPatterns, breathAt, formatClock, dailyQuote, makeStore, affiliateUrl, parseMix, mixParam } from './core.js';
 import { imagePlacement, waterOutline, waterExclusions, isInsideWater } from './water-mask.js';
 import WaterRenderer from './water-renderer.js';
 
@@ -36,7 +36,7 @@ let local;
 try { local = window.localStorage; } catch { local = null; }
 const store = makeStore(local);
 const audio = new AmbientAudio();
-const soundNames = { rain: 'Chuva mansa', ocean: 'Mar tranquilo', forest: 'Brisa na mata', fire: 'Lareira acesa' };
+const soundNames = { rain: 'Chuva mansa', ocean: 'Mar tranquilo', forest: 'Brisa na mata', fire: 'Lareira acesa', brown: 'Ruído marrom', white: 'Ruído branco', pink: 'Ruído rosa' };
 let toastTimer;
 function toast(text) { const node = $('#toast'); node.textContent = text; node.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { node.hidden = true; }, 4200); }
 
@@ -107,13 +107,15 @@ sizeWater();
 
 // Breath timing uses elapsed active time, not a drifting decrementing counter.
 let breathPlan = createBreathPlan(), breathState = 'idle', breathElapsed = 0, breathStarted = 0, breathFrame = 0, lastBreathPhase = '';
-const breathDialog = $('#breath-dialog'), breathStart = $('#breath-start'), breathSelection = $('#breath-duration'), breathHold = $('#breath-hold');
+const breathDialog = $('#breath-dialog'), breathStart = $('#breath-start'), breathSelection = $('#breath-duration'), breathHold = $('#breath-hold'), breathPattern = $('#breath-pattern');
+function currentBreathPlan() { return breathPattern.value === 'free' ? createBreathPlan(breathSelection.value, breathHold.checked) : createNamedPlan(breathPattern.value); }
 function breathPreview() { const hold = breathHold.checked; breathSelection.options[0].textContent = `3 ciclos · ${hold ? 39 : 30} segundos`; breathSelection.options[1].textContent = `5 ciclos · ${hold ? 65 : 50} segundos`; }
 breathHold.addEventListener('change', breathPreview);
-function breathControls(locked) { breathSelection.disabled = locked; breathHold.disabled = locked; $('#breath-stop').hidden = !locked; }
-function openBreath(selection = 'cycles5', trigger) { if (!['running', 'paused'].includes(breathState)) { breathSelection.value = selection; breathPlan = createBreathPlan(selection, breathHold.checked); resetBreath(); } openDialog('breath-dialog', trigger); }
-function resetBreath() { cancelAnimationFrame(breathFrame); breathState = 'idle'; breathElapsed = 0; lastBreathPhase = ''; breathControls(false); breathStart.textContent = 'Começar'; $('#breath-phase').textContent = 'No seu tempo'; $('#breath-number').textContent = '—'; $('#breath-cycle').textContent = 'Uma respiração de cada vez.'; $('#breath-orb').style.transform = 'scale(1)'; }
-function startBreath() { breathPlan = createBreathPlan(breathSelection.value, breathHold.checked); breathState = 'running'; breathElapsed = 0; breathStarted = performance.now(); lastBreathPhase = ''; breathControls(true); breathStart.textContent = 'Pausar'; breathFrame = requestAnimationFrame(tickBreath); }
+breathPattern.addEventListener('change', () => { if (breathState === 'idle') { breathPlan = currentBreathPlan(); resetBreath(); } else breathControls(true); });
+function breathControls(locked) { const named = breathPattern.value !== 'free'; breathSelection.disabled = locked || named; breathHold.disabled = locked || named; breathPattern.disabled = locked; $('#breath-stop').hidden = !locked; }
+function openBreath(selection = 'cycles5', trigger, pattern = 'free') { if (!['running', 'paused'].includes(breathState)) { breathPattern.value = Object.hasOwn(breathPatterns, pattern) ? pattern : 'free'; breathSelection.value = selection; breathPlan = currentBreathPlan(); resetBreath(); } openDialog('breath-dialog', trigger); }
+function resetBreath() { cancelAnimationFrame(breathFrame); breathState = 'idle'; breathElapsed = 0; lastBreathPhase = ''; breathControls(false); breathStart.textContent = 'Começar'; $('#breath-phase').textContent = 'No seu tempo'; $('#breath-number').textContent = '—'; $('#breath-cycle').textContent = breathPattern.value === 'free' ? 'Uma respiração de cada vez.' : `${breathPatterns[breathPattern.value].label} · ${breathPlan.cycles} ciclos`; $('#breath-orb').style.transform = 'scale(1)'; }
+function startBreath() { breathPlan = currentBreathPlan(); breathState = 'running'; breathElapsed = 0; breathStarted = performance.now(); lastBreathPhase = ''; breathControls(true); breathStart.textContent = 'Pausar'; breathFrame = requestAnimationFrame(tickBreath); }
 function pauseBreath() { if (breathState !== 'running') return; breathElapsed += performance.now() - breathStarted; breathState = 'paused'; cancelAnimationFrame(breathFrame); breathStart.textContent = 'Continuar'; $('#breath-phase').textContent = 'Sua pausa'; $('#breath-cycle').textContent = 'Continue quando quiser.'; $('#breath-status').textContent = 'Sessão pausada. Continue quando quiser.'; }
 function tickBreath(now) {
   if (breathState !== 'running') return;
@@ -123,7 +125,7 @@ function tickBreath(now) {
   if (phaseKey !== lastBreathPhase) { lastBreathPhase = phaseKey; $('#breath-phase').textContent = step.label; $('#breath-cycle').textContent = `Ciclo ${step.cycle} de ${breathPlan.cycles}`; $('#breath-status').textContent = `${step.label}. Ciclo ${step.cycle} de ${breathPlan.cycles}.`; }
   $('#breath-number').textContent = step.remaining;
   const ease = .5 - .5 * Math.cos(Math.PI * step.progress);
-  const scale = step.type === 'in' ? .82 + .38 * ease : step.type === 'hold' ? 1.2 : 1.2 - .38 * ease;
+  const scale = step.type === 'in' ? .82 + .38 * ease : step.type === 'hold' ? 1.2 : step.type === 'hold-empty' ? .82 : 1.2 - .38 * ease;
   $('#breath-orb').style.transform = reducedMotion.matches ? 'scale(1)' : `scale(${scale})`;
   breathFrame = requestAnimationFrame(tickBreath);
 }
@@ -156,6 +158,7 @@ function renderAudio() {
   const any = Object.values(volumes).some(value => value > 0);
   if (!any) { soundDeadline = 0; $('#sound-timer-status').textContent = ''; }
   $$('.sound-toggle').forEach(button => { const name = button.dataset.sound; const selected = Boolean(volumes[name] > 0); button.setAttribute('aria-pressed', String(selected)); button.setAttribute('aria-label', (selected ? 'Desligar ' : 'Tocar ') + soundNames[name]); button.innerHTML = icon(selected && !audioPaused ? 'pause' : 'play'); });
+  $$('.noise-toggle').forEach(button => { const selected = Boolean(volumes[button.dataset.noise] > 0); button.setAttribute('aria-pressed', String(selected)); button.classList.toggle('selected', selected); });
   $('#audio-pause').disabled = !any; $('#audio-stop').disabled = !any; $('#audio-pause').innerHTML = icon(audioPaused ? 'play' : 'pause') + (audioPaused ? 'Continuar sons' : 'Pausar sons');
   const seaPlaying=Boolean(volumes.ocean>0)&&audio.playing&&!audioPaused;
   heroAudio.innerHTML=icon(seaPlaying?'pause':'waves')+'<span>'+(seaPlaying?'Mar tranquilo · pausar':'Ativar som do mar')+'</span>';
@@ -165,6 +168,7 @@ function renderAudio() {
 async function changeSound(name, value) { defaultSeaPending=false;store.write('sound-preference',value>0);try { await audio.set(name, value); audioPaused = false; if (value > 0 && !soundDeadline && Number($('#sound-timer').value)) soundDeadline = Date.now() + Number($('#sound-timer').value) * 60000; $('#sound-status').textContent = ''; renderAudio(); } catch { $('#sound-status').textContent = 'Não foi possível iniciar o áudio. Tente tocar novamente ou use outro navegador.'; } }
 $$('.sound-toggle').forEach(button => button.addEventListener('click', () => { const name = button.dataset.sound; const selected = audio.volumes[name] > 0; const input = $('#volume-' + name); if (!selected && Number(input.value) === 0) { input.value = '35'; $('#value-' + name).textContent = '35%'; } changeSound(name, selected ? 0 : Number(input.value) / 100); }));
 $$('[data-volume]').forEach(input => input.addEventListener('input', () => { const name = input.dataset.volume; $('#value-' + name).textContent = input.value + '%'; if (audio.volumes[name] > 0) changeSound(name, Number(input.value) / 100); }));
+$$('.noise-toggle').forEach(button => button.addEventListener('click', () => { const name = button.dataset.noise; changeSound(name, audio.volumes[name] > 0 ? 0 : 0.45); }));
 $('#audio-pause').addEventListener('click', async () => { defaultSeaPending=false;try { if (audioPaused) { await audio.resume(); audioPaused = false; } else { await audio.pause(); audioPaused = true; } store.write('sound-preference',!audioPaused);renderAudio(); } catch { $('#sound-status').textContent = 'Toque novamente para retomar os sons.'; } });
 async function stopSounds() { defaultSeaPending=false;store.write('sound-preference',false);await audio.stopAll(); soundDeadline = 0; audioPaused = false; renderAudio(); $('#sound-timer-status').textContent = ''; }
 $('#audio-stop').addEventListener('click', stopSounds);
@@ -262,7 +266,7 @@ function renderSpace() {
   const quote = $('#saved-quote'); clearElement(quote); const savedQuote = store.read('quote');
   if (typeof savedQuote === 'string' && savedQuote.length < 400) { const piece = document.createElement('div'); piece.className = 'saved-piece'; const label = document.createElement('p'); label.textContent = 'Uma frase que ficou'; const block = document.createElement('blockquote'); block.textContent = savedQuote; piece.append(label, block, makeButton('Remover frase', 'text-button', () => { store.remove('quote'); renderQuoteSave(); renderSpace(); })); quote.append(piece); }
   const mixNode = $('#saved-mix'); clearElement(mixNode); const mix = store.read('mix');
-  if (mix && typeof mix === 'object' && Object.keys(soundNames).some(key => Number(mix[key]) > 0)) { const piece = document.createElement('div'); piece.className = 'saved-piece'; const label = document.createElement('p'); label.textContent = 'Minha paisagem: ' + Object.keys(soundNames).filter(key => Number(mix[key]) > 0).map(key => soundNames[key]).join(', '); piece.append(label, makeButton('Ouvir minha combinação', 'text-button', async () => { try { await stopSounds(); for (const key of Object.keys(soundNames)) { const value = Math.min(1, Math.max(0, Number(mix[key]) || 0)); if (value > 0) { $('#volume-' + key).value = Math.round(value * 100); $('#value-' + key).textContent = Math.round(value * 100) + '%'; await changeSound(key, value); } } $('#space-dialog').close(); $('#sons').scrollIntoView({ behavior: reducedMotion.matches ? 'instant' : 'smooth' }); } catch { toast('Toque nos sons para iniciar sua paisagem.'); } }), makeButton('Remover combinação', 'text-button', () => { store.remove('mix'); renderSpace(); })); mixNode.append(piece); }
+  if (mix && typeof mix === 'object' && Object.keys(soundNames).some(key => Number(mix[key]) > 0)) { const piece = document.createElement('div'); piece.className = 'saved-piece'; const label = document.createElement('p'); label.textContent = 'Minha paisagem: ' + Object.keys(soundNames).filter(key => Number(mix[key]) > 0).map(key => soundNames[key]).join(', '); piece.append(label, makeButton('Ouvir minha combinação', 'text-button', async () => { try { await stopSounds(); for (const key of Object.keys(soundNames)) { const value = Math.min(1, Math.max(0, Number(mix[key]) || 0)); if (value > 0) { const input = $('#volume-' + key); if (input) { input.value = Math.round(value * 100); $('#value-' + key).textContent = Math.round(value * 100) + '%'; } await changeSound(key, value); } } $('#space-dialog').close(); $('#sons').scrollIntoView({ behavior: reducedMotion.matches ? 'instant' : 'smooth' }); } catch { toast('Toque nos sons para iniciar sua paisagem.'); } }), makeButton('Remover combinação', 'text-button', () => { store.remove('mix'); renderSpace(); })); mixNode.append(piece); }
   if (!store.persistent) $('#storage-note').textContent = 'Este navegador não permite guardar dados. Seus favoritos ficam disponíveis só durante esta visita.';
 }
 $('#space-open').addEventListener('click', event => { renderSpace(); openDialog('space-dialog', event.currentTarget); });
@@ -282,3 +286,28 @@ window.addEventListener('appinstalled', () => { $('#install-description').textCo
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => { $('#install-description').textContent += ' O modo offline não está disponível nesta visita.'; });
 window.addEventListener('pagehide', event => { if (event.persisted) { audio.pause().catch(() => {}); audioPaused = true; renderAudio(); } else {audio.destroy().catch(() => {});waterScene.destroy();} cancelAnimationFrame(waterFrame); waterFrame = 0; pauseBreath(); });
 window.addEventListener('pageshow', event => { if (event.persisted) { sizeWater(); tickFocus(); checkSoundTimer(); } });
+
+// Deep links: a paisagem chega armada, nunca tocando sozinha — o navegador exige um gesto.
+let pendingMix = null;
+const mixPlay = $('#mix-play');
+function armMix(mix) {
+  pendingMix = mix;
+  for (const [name, value] of Object.entries(mix)) { const input = $('#volume-' + name); if (input) { input.value = Math.round(value * 100); $('#value-' + name).textContent = Math.round(value * 100) + '%'; } }
+  mixPlay.hidden = false;
+  $('#sound-status').textContent = 'Sua paisagem chegou pelo link. Toque para ouvir.';
+}
+mixPlay.addEventListener('click', async () => { const mix = pendingMix; pendingMix = null; mixPlay.hidden = true; defaultSeaPending = false; for (const [name, value] of Object.entries(mix)) await changeSound(name, value); });
+$('#mix-link').addEventListener('click', async () => {
+  const param = mixParam(audio.volumes);
+  if (!param) { toast('Toque um som antes de copiar o link da paisagem.'); return; }
+  const url = config.siteOrigin + '/?mix=' + param;
+  try { await navigator.clipboard.writeText(url); $('#sound-status').textContent = 'Link da paisagem copiado. Quem abrir ouve a mesma combinação.'; }
+  catch { $('#sound-status').textContent = 'Copie o link da paisagem: ' + url; }
+});
+const entryParams = new URLSearchParams(location.search);
+const entryMix = parseMix(entryParams.get('mix'), Object.keys(soundNames));
+if (entryMix) { defaultSeaPending = false; armMix(entryMix); }
+const entryPattern = entryParams.get('resp');
+if (Object.hasOwn(breathPatterns, entryPattern || '')) openBreath('cycles5', null, entryPattern);
+const entryFocus = Number(entryParams.get('foco'));
+if ([...focusLength.options].some(option => Number(option.value) === entryFocus)) { focusLength.value = String(entryFocus); focusRemaining = focusDuration(); openFocus(null); }

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createBreathPlan, breathAt, formatClock, dailyQuote, makeStore, affiliateUrl } from '../dist/assets/core.js';
+import { createBreathPlan, createNamedPlan, breathPatterns, breathAt, formatClock, dailyQuote, makeStore, affiliateUrl, parseMix, mixParam } from '../dist/assets/core.js';
 
 for (const hold of [false, true]) {
   for (const selection of ['cycles3', 'cycles5', 'time60', 'time180', 'time300', 'time600']) {
@@ -35,4 +35,27 @@ const transient = makeStore(null); assert.equal(transient.persistent, false); as
 const url = new URL(affiliateUrl('máscara de dormir', 'abcinvestimen-20'));
 assert.equal(url.hostname, 'www.amazon.com.br'); assert.equal(url.searchParams.get('tag'), 'abcinvestimen-20'); assert.equal(url.searchParams.get('k'), 'máscara de dormir');
 assert.equal(new URL(affiliateUrl('a', 'bad&id=1')).searchParams.has('tag'), false);
-console.log('Core: 12 planos de respiração, limites e duração exata, relógio, frase por data, armazenamento e links afiliados verificados.');
+for (const [id, pattern] of Object.entries(breathPatterns)) {
+  const plan = createNamedPlan(id);
+  assert.equal(plan.cycles, pattern.cycles);
+  assert.equal(plan.duration, pattern.cycles * pattern.phases.reduce((sum, [, ms]) => sum + ms, 0));
+  assert.equal(plan.steps.at(-1).end, plan.duration);
+  for (let i = 1; i < plan.steps.length; i++) assert.equal(plan.steps[i].at, plan.steps[i - 1].end);
+  assert.equal(breathAt(plan, plan.duration).complete, true);
+}
+assert.throws(() => createNamedPlan('nope'));
+assert.equal(createNamedPlan('quadrada', 2).cycles, 2);
+assert.equal(createNamedPlan('quadrada', 99).cycles, 20);
+const allowed = ['rain', 'ocean', 'brown'];
+assert.deepEqual(parseMix('rain:40,ocean:35', allowed), { rain: .4, ocean: .35 });
+assert.equal(parseMix('rain:0', allowed), null);
+assert.equal(parseMix('rain:101', allowed), null);
+assert.equal(parseMix('hack:50', allowed), null);
+assert.equal(parseMix('rain:abc', allowed), null);
+assert.equal(parseMix('', allowed), null);
+assert.equal(parseMix(null, allowed), null);
+assert.deepEqual(parseMix('brown:60,rain:40,rain:90', allowed), { brown: .6, rain: .9 });
+assert.equal(mixParam({ rain: .4, ocean: 0, brown: .6 }), 'rain:40,brown:60');
+assert.equal(mixParam({ rain: 0 }), null);
+assert.deepEqual(parseMix(mixParam({ rain: .4, brown: .6 }), allowed), { rain: .4, brown: .6 });
+console.log('Core: 12 planos livres, 3 padrões nomeados, mix por URL, relógio, frase por data, armazenamento e links afiliados verificados.');
