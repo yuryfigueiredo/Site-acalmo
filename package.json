@@ -3,5 +3,5 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "scripts": {"build": "node scripts/build.mjs", "check": "node --experimental-vm-modules scripts/check.mjs", "test": "node tests/core.test.mjs && node tests/audio.test.mjs && node tests/water-mask.test.mjs && node tests/editorial.test.mjs", "editorial:prepare":"node scripts/editorial.mjs prepare", "editorial:generate":"node scripts/editorial.mjs generate"}
+  "scripts": {"build": "node scripts/build.mjs", "check": "node --experimental-vm-modules scripts/check.mjs", "test": "node tests/core.test.mjs && node tests/audio.test.mjs && node tests/water-mask.test.mjs && node tests/editorial.test.mjs && node tests/tools.test.mjs", "editorial:prepare":"node scripts/editorial.mjs prepare", "editorial:generate":"node scripts/editorial.mjs generate"}
 }

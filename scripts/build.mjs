@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 await import('./content.mjs');
+await import('./tools.mjs');
 // Um dist/ acumulado publicaria para sempre o arquivo que saiu do src/ — e o service worker o guardaria junto.
 await rm(path.join(root, 'dist'), { recursive: true, force: true });
 await mkdir(path.join(root, 'dist'), { recursive: true });
