@@ -21,6 +21,8 @@ const width = Number(arg('width', 1440));
 const height = Number(arg('height', 900));
 const dpr = Number(arg('dpr', 1));
 const full = process.argv.includes('--full');
+// --format jpeg serve para os cartões de compartilhamento, que precisam de bytes pequenos e aceitação universal.
+const format = arg('format', 'png');
 const wait = Number(arg('wait', 1500));
 const mobile = width < 900;
 
@@ -148,8 +150,10 @@ try {
     });
     await write(data, `full ${width}x${Math.ceil(content.height)}@${dpr}x`);
   } else {
-    const { data } = await send('Page.captureScreenshot', { format: 'png' });
-    await write(data, `viewport ${width}x${height}@${dpr}x`);
+    const capture = { format };
+    if (format === 'jpeg') capture.quality = Number(arg('quality', 82));
+    const { data } = await send('Page.captureScreenshot', capture);
+    await write(data, `viewport ${width}x${height}@${dpr}x ${format}`);
   }
 } finally {
   ws?.close();
