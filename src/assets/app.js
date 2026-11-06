@@ -1,6 +1,6 @@
 import AmbientAudio from './audio.js';
 import { config } from './config.js';
-import { createBreathPlan, createNamedPlan, breathPatterns, breathAt, formatClock, dailyQuote, makeStore, affiliateUrl, parseMix, mixParam } from './core.js';
+import { createBreathPlan, createNamedPlan, breathPatterns, breathAt, formatClock, dailyQuote, dailyPrompts, pushJournalHistory, readJournalHistory, makeStore, affiliateUrl, parseMix, mixParam } from './core.js';
 import { imagePlacement, waterOutline, waterExclusions, isInsideWater } from './water-mask.js';
 import WaterRenderer from './water-renderer.js';
 
@@ -144,7 +144,22 @@ const intentions = {
   silence: { title: 'Um minuto só para estar aqui.', text: 'Sem som. Sem tarefa. Apenas um movimento suave, se acompanhar a respiração fizer sentido para você.', action: 'Fazer uma pausa', favorite: 'breathing' }
 };
 let currentIntent = 'calm';
-$$('[data-intent]').forEach(button => button.addEventListener('click', () => { currentIntent = button.dataset.intent; const intent = intentions[currentIntent]; $$('[data-intent]').forEach(node => { const selected = node === button; node.classList.toggle('selected', selected); node.setAttribute('aria-pressed', String(selected)); }); $('#recommendation-title').textContent = intent.title; $('#recommendation-text').textContent = intent.text; $('#recommendation-start').textContent = intent.action; const save = $('[data-save]', $('#recommendation')); save.dataset.save = intent.favorite; save.setAttribute('aria-label', `Guardar ${favoriteMeta[intent.favorite].label.toLowerCase()} no meu espaço`); renderFavorites(); }));
+const recommendationLabel = $('#recommendation-label').textContent;
+function applyIntent(key, label = recommendationLabel) {
+  const intent = intentions[key];
+  if (!intent) return;
+  currentIntent = key;
+  $$('[data-intent]').forEach(node => { const selected = node.dataset.intent === key; node.classList.toggle('selected', selected); node.setAttribute('aria-pressed', String(selected)); });
+  $('#recommendation-label').textContent = label;
+  $('#recommendation-title').textContent = intent.title;
+  $('#recommendation-text').textContent = intent.text;
+  $('#recommendation-start').textContent = intent.action;
+  const save = $('[data-save]', $('#recommendation'));
+  save.dataset.save = intent.favorite;
+  save.setAttribute('aria-label', `Guardar ${favoriteMeta[intent.favorite].label.toLowerCase()} no meu espaço`);
+  renderFavorites();
+}
+$$('[data-intent]').forEach(button => button.addEventListener('click', () => applyIntent(button.dataset.intent)));
 $('#recommendation-start').addEventListener('click', event => { if (currentIntent === 'rest') $('#sons').scrollIntoView({ behavior: reducedMotion.matches ? 'instant' : 'smooth' }); else if (currentIntent === 'write') openJournal(event.currentTarget); else if (currentIntent === 'focus') openFocus(event.currentTarget); else openBreath(currentIntent === 'silence' ? 'time60' : 'cycles5', event.currentTarget); });
 
 // Sea ambience is the default; browser autoplay rules and an explicit mute are respected.
@@ -152,7 +167,7 @@ let defaultSeaPending=store.read('sound-preference',true)!==false, defaultSeaBus
 const heroAudio=document.createElement('button');
 heroAudio.id='hero-audio';heroAudio.className='hero-sound';heroAudio.type='button';
 hero.append(heroAudio);
-let soundDeadline = 0, audioPaused = false;
+let soundDeadline = 0, audioPaused = false, fadeFor = 0;
 function renderAudio() {
   const volumes = audio.volumes;
   const any = Object.values(volumes).some(value => value > 0);
@@ -165,15 +180,38 @@ function renderAudio() {
   heroAudio.setAttribute('aria-pressed',String(seaPlaying));
   heroAudio.setAttribute('aria-label',seaPlaying?'Pausar som do mar':'Ativar som do mar');
 }
-async function changeSound(name, value) { defaultSeaPending=false;store.write('sound-preference',value>0);try { await audio.set(name, value); audioPaused = false; if (value > 0 && !soundDeadline && Number($('#sound-timer').value)) soundDeadline = Date.now() + Number($('#sound-timer').value) * 60000; $('#sound-status').textContent = ''; renderAudio(); } catch { $('#sound-status').textContent = 'Não foi possível iniciar o áudio. Tente tocar novamente ou use outro navegador.'; } }
+async function changeSound(name, value) { defaultSeaPending=false;store.write('sound-preference',value>0);try { await audio.set(name, value); audioPaused = false; if (value > 0 && !soundDeadline && Number($('#sound-timer').value)) soundDeadline = Date.now() + Number($('#sound-timer').value) * 60000; fadeFor = 0; $('#sound-status').textContent = ''; renderAudio(); } catch { $('#sound-status').textContent = 'Não foi possível iniciar o áudio. Tente tocar novamente ou use outro navegador.'; } }
 $$('.sound-toggle').forEach(button => button.addEventListener('click', () => { const name = button.dataset.sound; const selected = audio.volumes[name] > 0; const input = $('#volume-' + name); if (!selected && Number(input.value) === 0) { input.value = '35'; $('#value-' + name).textContent = '35%'; } changeSound(name, selected ? 0 : Number(input.value) / 100); }));
 $$('[data-volume]').forEach(input => input.addEventListener('input', () => { const name = input.dataset.volume; $('#value-' + name).textContent = input.value + '%'; if (audio.volumes[name] > 0) changeSound(name, Number(input.value) / 100); }));
 $$('.noise-toggle').forEach(button => button.addEventListener('click', () => { const name = button.dataset.noise; changeSound(name, audio.volumes[name] > 0 ? 0 : 0.45); }));
-$('#audio-pause').addEventListener('click', async () => { defaultSeaPending=false;try { if (audioPaused) { await audio.resume(); audioPaused = false; } else { await audio.pause(); audioPaused = true; } store.write('sound-preference',!audioPaused);renderAudio(); } catch { $('#sound-status').textContent = 'Toque novamente para retomar os sons.'; } });
-async function stopSounds() { defaultSeaPending=false;store.write('sound-preference',false);await audio.stopAll(); soundDeadline = 0; audioPaused = false; renderAudio(); $('#sound-timer-status').textContent = ''; }
+$('#audio-pause').addEventListener('click', async () => { defaultSeaPending=false;fadeFor=0;try { if (audioPaused) { await audio.resume(); audioPaused = false; } else { await audio.pause(); audioPaused = true; } store.write('sound-preference',!audioPaused);renderAudio(); } catch { $('#sound-status').textContent = 'Toque novamente para retomar os sons.'; } });
+async function stopSounds() { defaultSeaPending=false;store.write('sound-preference',false);fadeFor = 0;await audio.stopAll(); soundDeadline = 0; audioPaused = false; renderAudio(); $('#sound-timer-status').textContent = ''; }
 $('#audio-stop').addEventListener('click', stopSounds);
-$('#sound-timer').addEventListener('change', () => { const minutes = Number($('#sound-timer').value); soundDeadline = minutes && Object.values(audio.volumes).some(v => v > 0) ? Date.now() + minutes * 60000 : 0; if (minutes && !soundDeadline) $('#sound-timer-status').textContent = 'O tempo começa ao tocar um som.'; else checkSoundTimer(); });
-function checkSoundTimer() { if (!soundDeadline) return; const remaining = soundDeadline - Date.now(); if (remaining <= 0) { stopSounds(); $('#sound-status').textContent = 'O tempo escolhido terminou. Os sons foram encerrados.'; } else $('#sound-timer-status').textContent = 'Restam ' + formatClock(remaining); }
+$('#sound-timer').addEventListener('change', () => { cancelSleepFade(); const minutes = Number($('#sound-timer').value); soundDeadline = minutes && Object.values(audio.volumes).some(v => v > 0) ? Date.now() + minutes * 60000 : 0; if (minutes && !soundDeadline) $('#sound-timer-status').textContent = 'O tempo começa ao tocar um som.'; else { if (!soundDeadline) $('#sound-timer-status').textContent = ''; checkSoundTimer(); } });
+// The last minute before the deadline is a descent, not a cut: nobody should wake to sudden silence.
+const SLEEP_FADE_WINDOW = 60000;
+const SLEEP_FADE_MESSAGE = 'Os sons vão terminar suavemente.';
+function cancelSleepFade() {
+  if (!fadeFor) return;
+  fadeFor = 0;
+  audio.cancelFade().catch(() => {});
+  const status = $('#sound-status');
+  if (status.textContent === SLEEP_FADE_MESSAGE) status.textContent = '';
+}
+function checkSoundTimer() {
+  if (!soundDeadline) return;
+  const remaining = soundDeadline - Date.now();
+  if (remaining <= 0) { stopSounds(); $('#sound-status').textContent = 'O tempo escolhido terminou. Os sons foram encerrados.'; return; }
+  $('#sound-timer-status').textContent = 'Restam ' + formatClock(remaining);
+  if (remaining > SLEEP_FADE_WINDOW) { cancelSleepFade(); return; }
+  if (fadeFor === soundDeadline) return;
+  const armedFor = soundDeadline;
+  fadeFor = armedFor;
+  audio.fadeOut(remaining / 1000).then(started => {
+    if (!started) { if (fadeFor === armedFor) fadeFor = 0; return; }
+    if (fadeFor === armedFor) $('#sound-status').textContent = SLEEP_FADE_MESSAGE;
+  }).catch(() => { if (fadeFor === armedFor) fadeFor = 0; });
+}
 setInterval(checkSoundTimer, 1000);
 heroAudio.addEventListener('click',()=>{const playing=audio.volumes.ocean>0&&audio.playing&&!audioPaused;changeSound('ocean',playing?0:.18);});
 async function startDefaultSea(gesture=false){
@@ -202,15 +240,95 @@ $('[data-intent="silence"]').addEventListener('click',()=>{stopSounds().catch(()
 
 // Journal is ephemeral unless the visitor explicitly saves it to this browser.
 const journalFields = ['#journal-one', '#journal-two', '#journal-three'];
+const journalQuestions = dailyPrompts();
+['#journal-label-one', '#journal-label-two', '#journal-label-three'].forEach((selector, i) => { $(selector).textContent = journalQuestions[i]; });
 const savedJournal = store.read('journal');
-if (savedJournal && Array.isArray(savedJournal.answers) && savedJournal.answers.length === 3) { journalFields.forEach((selector, i) => { $(selector).value = String(savedJournal.answers[i] || '').slice(0, 4000); }); $('#journal-persist').checked = true; }
+const sameLocalDay = value => { const date = new Date(value); return Number.isFinite(date.getTime()) ? date.toDateString() === new Date().toDateString() : true; };
+if (savedJournal && Array.isArray(savedJournal.answers) && savedJournal.answers.length === 3) {
+  if (sameLocalDay(savedJournal.date)) {
+    $('#journal-persist').checked = true;
+    journalFields.forEach((selector, i) => { $(selector).value = String(savedJournal.answers[i] || '').slice(0, 4000); });
+  } else {
+    // Answers written for yesterday's questions must not sit invisible behind an empty
+    // draft, where the next save would overwrite and lose them.
+    store.write('journal-history', pushJournalHistory(store.read('journal-history'), savedJournal));
+    store.remove('journal');
+  }
+}
 function openJournal(trigger) { openDialog('journal-dialog', trigger); }
 $('#journal-open').addEventListener('click', event => openJournal(event.currentTarget));
-$('#journal-form').addEventListener('submit', event => { event.preventDefault(); const answers = journalFields.map(selector => $(selector).value); if (!answers.some(value => value.trim())) { $('#journal-status').textContent = 'Você pode escrever um pouco ou simplesmente fechar e voltar depois.'; return; } if ($('#journal-persist').checked) { const saved = store.write('journal', { answers, date: new Date().toISOString() }); $('#journal-status').textContent = saved ? 'Seu texto foi guardado neste navegador. Por agora, uma coisa de cada vez.' : 'O navegador não permitiu salvar. Seu texto continua nesta página; baixe uma cópia se quiser guardar.'; } else { store.remove('journal'); $('#journal-status').textContent = 'Sua escrita ficou apenas nesta página. Você pode fechar e respirar um pouco.'; } });
+$('#journal-form').addEventListener('submit', event => { event.preventDefault(); const answers = journalFields.map(selector => $(selector).value); if (!answers.some(value => value.trim())) { $('#journal-status').textContent = 'Você pode escrever um pouco ou simplesmente fechar e voltar depois.'; return; } const date = new Date().toISOString(); if ($('#journal-persist').checked) { const saved = store.write('journal', { answers, date }); store.write('journal-history', pushJournalHistory(store.read('journal-history'), { answers, date })); renderJournalHistory(); $('#journal-status').textContent = saved ? 'Seu texto foi guardado neste navegador. Por agora, uma coisa de cada vez.' : 'O navegador não permitiu salvar. Seu texto continua nesta página; baixe uma cópia se quiser guardar.'; } else { store.remove('journal'); $('#journal-status').textContent = 'Sua escrita ficou apenas nesta página. Você pode fechar e respirar um pouco.'; } });
 $('#journal-persist').addEventListener('change', event => { if (!event.target.checked) { store.remove('journal'); $('#journal-status').textContent = 'O texto salvo foi removido. A versão aberta continua nesta página.'; } });
 function download(blob, name) { const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = name; document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 15000); }
-$('#journal-export').addEventListener('click', () => { const questions = ['O que está ocupando a sua cabeça?', 'O que pode esperar um pouco?', 'Qual pequeno cuidado cabe neste momento?']; const text = 'Meu espaço de escrita — Acalmo\n\n' + journalFields.map((selector, i) => questions[i] + '\n' + $(selector).value).join('\n\n'); download(new Blob([text], { type: 'text/plain;charset=utf-8' }), 'minha-pausa-acalmo.txt'); $('#journal-status').textContent = 'Seu texto foi preparado para download no dispositivo.'; });
-$('#journal-delete').addEventListener('click', () => { if (!journalFields.some(selector => $(selector).value) && !store.read('journal')) return; if (!window.confirm('Apagar este texto da página e deste navegador? Baixe uma cópia antes, se quiser guardá-lo.')) return; journalFields.forEach(selector => { $(selector).value = ''; }); $('#journal-persist').checked = false; store.remove('journal'); $('#journal-status').textContent = 'O texto foi apagado deste navegador.'; });
+$('#journal-export').addEventListener('click', () => { const text = 'Meu espaço de escrita — Acalmo\n\n' + journalFields.map((selector, i) => journalQuestions[i] + '\n' + $(selector).value).join('\n\n'); download(new Blob([text], { type: 'text/plain;charset=utf-8' }), 'minha-pausa-acalmo.txt'); $('#journal-status').textContent = 'Seu texto foi preparado para download no dispositivo.'; });
+$('#journal-delete').addEventListener('click', () => { const answers = journalFields.map(selector => $(selector).value); if (!answers.some(value => value.trim()) && !store.read('journal')) return; if (!window.confirm('Apagar este texto da página e deste navegador? Baixe uma cópia antes, se quiser guardá-lo.')) return; journalFields.forEach(selector => { $(selector).value = ''; }); $('#journal-persist').checked = false; store.remove('journal');
+  // The copy already in the saved list is the same text: the promise to erase it has to reach it too.
+  store.write('journal-history', readJournalHistory(store.read('journal-history')).filter(entry => entry.answers.join('\n') !== answers.join('\n')));
+  renderJournalHistory(); $('#journal-status').textContent = 'O texto foi apagado deste navegador.'; });
+
+// Saved writings: a local list with the same quiet weight as the favorites. The seconds separate two writings saved in one minute.
+const journalHistoryDate = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+function renderJournalHistory() {
+  const history = readJournalHistory(store.read('journal-history'));
+  const section = $('#journal-history');
+  const list = $('#journal-history-list');
+  closeJournalHistoryView();
+  clearElement(list);
+  section.hidden = history.length === 0;
+  history.forEach((entry, index) => {
+    const label = journalHistoryDate.format(new Date(entry.date));
+    const row = document.createElement('div');
+    row.className = 'journal-history-row';
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'journal-history-open';
+    open.textContent = label;
+    open.setAttribute('aria-expanded', 'false');
+    open.setAttribute('aria-controls', 'journal-history-view');
+    open.addEventListener('click', () => showJournalEntry(entry, open));
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'journal-history-remove';
+    remove.innerHTML = icon('close');
+    remove.setAttribute('aria-label', 'Apagar a escrita de ' + label);
+    remove.addEventListener('click', () => {
+      const rest = readJournalHistory(store.read('journal-history'));
+      rest.splice(index, 1);
+      store.write('journal-history', rest);
+      renderJournalHistory();
+    });
+    row.append(open, remove);
+    list.append(row);
+  });
+}
+function showJournalEntry(entry, trigger) {
+  const view = $('#journal-history-view');
+  clearElement(view);
+  dailyPrompts(new Date(entry.date)).forEach((question, i) => {
+    const label = document.createElement('p');
+    label.className = 'journal-history-question';
+    label.textContent = question;
+    const answer = document.createElement('p');
+    answer.className = 'journal-history-answer';
+    answer.textContent = entry.answers[i] || '—';
+    view.append(label, answer);
+  });
+  const close = makeButton('Fechar esta escrita', 'text-button', () => closeJournalHistoryView(trigger));
+  view.append(close);
+  view.hidden = false;
+  $$('.journal-history-open').forEach(button => button.setAttribute('aria-expanded', String(button === trigger)));
+  view.focus();
+}
+function closeJournalHistoryView(trigger) {
+  const view = $('#journal-history-view');
+  if (view.hidden) return;
+  clearElement(view);
+  view.hidden = true;
+  $$('.journal-history-open').forEach(button => button.setAttribute('aria-expanded', 'false'));
+  if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+}
+$('#journal-history-clear').addEventListener('click', () => { if (!readJournalHistory(store.read('journal-history')).length) return; if (!window.confirm('Apagar todas as escritas guardadas deste navegador? Baixe uma cópia de cada uma antes, se quiser mantê-las.')) return; store.remove('journal-history'); renderJournalHistory(); $('#journal-status').textContent = 'As escritas guardadas foram apagadas deste navegador.'; });
+renderJournalHistory();
 
 // A focus block has a real deadline and never starts another block automatically.
 let focusMode = 'work', focusState = 'idle', focusRemaining = 25 * 60000, focusDeadline = 0;
@@ -271,6 +389,20 @@ function renderSpace() {
 }
 $('#space-open').addEventListener('click', event => { renderSpace(); openDialog('space-dialog', event.currentTarget); });
 renderFavorites(); renderQuoteSave();
+
+// One invitation for the time of day, for this visit only: nothing is stored and choosing an intention always wins.
+const periodDefaults = {
+  morning: { intent: 'calm', label: 'Uma sugestão para começar o dia' },
+  afternoon: { intent: 'focus', label: 'Uma sugestão para a tarde' },
+  evening: { intent: 'rest', label: 'Uma sugestão para o fim do dia' },
+  night: { intent: 'write', label: 'Uma sugestão para a noite' }
+};
+function periodOfDay(date = new Date()) {
+  const hour = date.getHours();
+  return hour < 6 ? 'night' : hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : hour < 22 ? 'evening' : 'night';
+}
+const dayPeriod = periodDefaults[periodOfDay()];
+applyIntent(dayPeriod.intent, dayPeriod.label);
 
 // All affiliate links use the owner's supplied StoreID; no prices or reviews are invented.
 const queries = { mask: 'mascara de dormir', notebook: 'caderno sem pauta', lamp: 'luminaria de mesa' };

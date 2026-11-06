@@ -17,6 +17,7 @@ export default class AmbientAudio {
     this._cleanupJobs = new Set();
     this._paused = false;
     this._destroyed = false;
+    this._sleepFade = 0;
     this._queue = Promise.resolve();
   }
 
@@ -26,6 +27,11 @@ export default class AmbientAudio {
 
   get playing() {
     return !this._destroyed && !this._paused && this._channels.size > 0 && this._context?.state === 'running';
+  }
+
+  // True while the master gain is drifting toward silence for the sound timer.
+  get fading() {
+    return this._sleepFade > 0;
   }
 
   async tryAutoplay(name, volume) {
@@ -70,12 +76,40 @@ export default class AmbientAudio {
     channel.volume = volume;
     this._channels.set(name, channel);
     this._fade(channel.gain.gain, volume * 0.3, existing ? 0.22 : name === 'ocean' ? 2.8 : 0.8);
+    // Bringing the mix back up always cancels a pending sleep fade.
+    this._sleepFade = 0;
     this._fade(this._master.gain, 0.65, 1.2);
+  }
+
+  /**
+   * Drift the master gain to silence over `seconds` without touching the mix,
+   * so a timer can end softly. Returns false when there is nothing to fade;
+   * the caller still owns the final stop.
+   */
+  async fadeOut(seconds = 60) {
+    const fadeSeconds = Math.max(1, Math.min(600, Number(seconds) || 60));
+    return this._enqueue(async () => {
+      if (this._paused || !this._channels.size || !this._master || this._context?.state !== 'running') return false;
+      this._fade(this._master.gain, 0, fadeSeconds);
+      this._sleepFade = fadeSeconds;
+      return true;
+    });
+  }
+
+  // Ends a sleep fade early: the mix returns to its normal level instead of going silent.
+  async cancelFade() {
+    return this._enqueue(async () => {
+      if (!this._sleepFade) return false;
+      this._sleepFade = 0;
+      if (!this._paused && this._channels.size && this._master && this._context?.state === 'running') this._fade(this._master.gain, 0.65, 1.2);
+      return true;
+    });
   }
 
   async pause() {
     return this._enqueue(async () => {
       this._paused = true;
+      this._sleepFade = 0;
       if (!this._context || this._context.state !== 'running') return;
       if (this._master) {
         this._fade(this._master.gain, 0);
@@ -91,12 +125,14 @@ export default class AmbientAudio {
       if (!this._channels.size) return;
       await this._activate();
       this._paused = false;
+      this._sleepFade = 0;
       this._fade(this._master.gain, 0.65);
     });
   }
 
   async stopAll() {
     return this._enqueue(async () => {
+      this._sleepFade = 0;
       for (const channel of this._channels.values()) this._retire(channel);
       this._channels.clear();
       this._paused = false;
@@ -131,6 +167,7 @@ export default class AmbientAudio {
       this._buffers.clear();
       this._context = null;
       this._master = null;
+      this._sleepFade = 0;
       this._destroyed = true;
     });
   }

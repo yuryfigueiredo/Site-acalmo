@@ -24,7 +24,7 @@ const full = process.argv.includes('--full');
 const wait = Number(arg('wait', 1500));
 const mobile = width < 900;
 
-const chrome = spawn(CHROME, [
+const chromeArgs = [
   '--headless=new',
   `--remote-debugging-port=${PORT}`,
   '--no-first-run',
@@ -35,7 +35,11 @@ const chrome = spawn(CHROME, [
   '--force-device-scale-factor=1',
   `--window-size=${width},${height}`,
   'about:blank',
-], { stdio: 'ignore' });
+];
+// --autoplay permite fotografar estados que só existem com som tocando de verdade no headless.
+if (process.argv.includes('--autoplay')) chromeArgs.push('--autoplay-policy=no-user-gesture-required');
+
+const chrome = spawn(CHROME, chromeArgs, { stdio: 'ignore' });
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 

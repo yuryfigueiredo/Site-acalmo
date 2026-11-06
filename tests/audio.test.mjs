@@ -148,6 +148,54 @@ test('blocked autoplay returns promptly without resume or sound nodes and the ne
   }
 });
 
+test('the sleep fade lowers the master toward silence and any new sound cancels it', async () => {
+  const previous = globalThis.AudioContext;
+  globalThis.AudioContext = Context;
+  Context.instances = [];
+  Context.initialState = 'running';
+  const audio = new AmbientAudio();
+  try {
+    assert.equal(await audio.fadeOut(60), false, 'a fade with nothing playing must not open an audio context');
+    assert.equal(Context.instances.length, 0);
+    assert.equal(audio.fading, false);
+    await audio.set('rain', 0.4);
+    const master = audio._master.gain;
+    assert.equal(await audio.fadeOut(60), true);
+    assert.equal(audio.fading, true, 'the descent stays flagged while the timer runs');
+    assert.deepEqual(master.ramps.at(-1), { value: 0, time: 60 }, 'the volume drifts to silence across the whole window');
+    assert.equal(audio.volumes.rain, 0.4, 'the mix must stay intact during the descent');
+    await audio.set('rain', 0.3);
+    assert.equal(audio.fading, false, 'changing the volume cancels the descent');
+    assert.equal(master.ramps.at(-1).value, 0.65, 'the master returns to its normal level');
+    assert.equal(await audio.fadeOut(45), true);
+    assert.deepEqual(master.ramps.at(-1), { value: 0, time: 45 });
+    assert.equal(await audio.cancelFade(), true);
+    assert.equal(audio.fading, false);
+    assert.equal(master.ramps.at(-1).value, 0.65);
+    assert.equal(await audio.cancelFade(), false, 'cancelling with no descent in progress does nothing');
+    assert.equal(await audio.fadeOut(5000), true, 'the window is clamped to a reasonable length');
+    assert.deepEqual(master.ramps.at(-1), { value: 0, time: 600 });
+    await audio.pause();
+    assert.equal(audio.fading, false, 'pausing ends the descent');
+    await audio.resume();
+    assert.equal(audio.fading, false);
+    assert.equal(await audio.fadeOut(30), true);
+    await audio.stopAll();
+    assert.deepEqual(audio.volumes, {});
+    assert.equal(audio.fading, false, 'stopping everything clears the descent state');
+    assert.equal(master.ramps.at(-1).value, 0);
+    assert.equal(Context.instances[0].state, 'suspended');
+    await new Promise(resolve => setTimeout(resolve, 220));
+    assert.equal(audio._cleanupJobs.size, 0);
+    await audio.destroy();
+    assert.ok(Context.instances[0].nodes.every(node => node.disconnected), 'every node is released after the descent');
+  } finally {
+    await audio.destroy();
+    Context.initialState = 'suspended';
+    globalThis.AudioContext = previous;
+  }
+});
+
 test('permitted autoplay starts softly, reports actual playback and cleans up normally', async () => {
   const previous = globalThis.AudioContext;
   globalThis.AudioContext = Context;

@@ -32,6 +32,58 @@ export const quotes = [
   'Estar presente pode começar com perceber os próprios pés.'
 ];
 
+// Three questions per day. Gentle invitations, no clinical tone and no promise of an outcome.
+export const journalPrompts = [
+  ['O que está ocupando a sua cabeça?', 'O que pode esperar um pouco?', 'Qual pequeno cuidado cabe neste momento?'],
+  ['Como você acordou hoje?', 'O que você quer que aconteça neste dia?', 'Qual primeiro passo já cabe agora?'],
+  ['Quantas coisas você está carregando ao mesmo tempo?', 'Qual delas pode esperar até amanhã?', 'O que sobra quando você tira uma?'],
+  ['O que o seu corpo está pedindo hoje?', 'Há quanto tempo você não para de verdade?', 'Que pausa de poucos minutos faria sentido agora?'],
+  ['O que ficou por dizer hoje?', 'O que deu certo, mesmo pequeno?', 'O que você deixa aqui antes de descansar?'],
+  ['O que está na sua frente agora?', 'Do que você precisa se afastar um pouco?', 'O que você leva deste instante para depois?'],
+  ['O que você fez hoje que ninguém vai notar?', 'O que te devolve um pouco de ar?', 'O que você pode não resolver hoje?'],
+  ['Com quem você gostaria de falar e adiou?', 'Qual conversa você vem evitando?', 'O que você diria a você mesmo com mais gentileza?'],
+  ['O que você vem adiando sem perceber?', 'O que precisa apenas de um começo pequeno?', 'O que ficou incompleto — e está tudo bem?']
+];
+
+export function dailyPrompts(date = new Date()) {
+  // Calendar-day arithmetic avoids daylight-saving shifts and repeats yearly.
+  const day = Math.floor((Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - Date.UTC(date.getFullYear(), 0, 0)) / 86400000);
+  return journalPrompts[(day - 1) % journalPrompts.length];
+}
+
+// Local writing history: newest first, capped, and only what the visitor chose to save.
+export const journalHistoryLimit = 30;
+
+export function normalizeJournalEntry(entry) {
+  if (!entry || !Array.isArray(entry.answers)) return null;
+  const answers = entry.answers.slice(0, 3).map(answer => typeof answer === 'string' ? answer.slice(0, 4000) : '');
+  while (answers.length < 3) answers.push('');
+  if (!answers.some(answer => answer.trim())) return null;
+  const raw = typeof entry.date === 'string' ? entry.date : '';
+  const date = Number.isFinite(Date.parse(raw)) ? new Date(raw).toISOString() : new Date().toISOString();
+  return { date, answers };
+}
+
+export function readJournalHistory(raw, limit = journalHistoryLimit) {
+  if (!Array.isArray(raw)) return [];
+  const history = [];
+  for (const item of raw) {
+    const entry = normalizeJournalEntry(item);
+    if (entry) history.push(entry);
+    if (history.length >= limit) break;
+  }
+  return history;
+}
+
+export function pushJournalHistory(raw, entry, limit = journalHistoryLimit) {
+  const history = readJournalHistory(raw, limit);
+  const fresh = normalizeJournalEntry(entry);
+  // The same text sent twice in a row is one memory, not two.
+  const repeated = fresh && history[0] && fresh.answers.join('\n') === history[0].answers.join('\n');
+  if (fresh && !repeated) history.unshift(fresh);
+  return history.slice(0, limit);
+}
+
 export function createBreathPlan(selection = 'cycles5', withHold = false) {
   const hold = withHold ? 3000 : 0;
   const cycleSelections = { cycles3: 3, cycles5: 5 };
