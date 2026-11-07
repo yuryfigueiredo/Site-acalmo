@@ -18,15 +18,15 @@ try {
     // Dark via emulated preference, before any module runs.
     await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'dark' }] });
     await send('Page.navigate', { url: BASE + route }); await sleep(900);
-    check('escuro: theme-color escura ' + route, await meta() === '#172a24', await meta());
+    check('escuro: theme-color escura ' + route, await meta() === '#091e32', await meta());
     // Light via the visible toggle (page.js) or the stored preference.
     await evaluate(`localStorage.removeItem('acalmo:theme')`);
     await send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] });
     await send('Page.navigate', { url: BASE + route }); await sleep(900);
     const before = await meta();
     const toggled = await evaluate(`(()=>{const b=document.getElementById('page-theme')||document.getElementById('theme-toggle');if(!b)return 'no-button';b.click();return document.querySelector('meta[name=theme-color]').content;})()`);
-    check('claro começa claro ' + route, before === '#f5f2e9', before);
-    check('toggle escurece ' + route, toggled === '#172a24', toggled);
+    check('claro começa claro ' + route, before === '#eef5f0', before);
+    check('toggle escurece ' + route, toggled === '#091e32', toggled);
   }
   console.log(failures ? `\n${failures} falharam.` : '\nTema: cor da barra segue o modo escuro na carga e ao alternar, em ferramentas, artigos e home.');
 } finally { ws?.close(); chrome.kill(); }

@@ -306,9 +306,12 @@ try {
   await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: seed.identifier });
 
   // ---------- nothing leaves the browser ----------
-  const external = requests.filter(url => !url.startsWith(BASE));
+  // data: e blob: já são bytes dentro do navegador, não uma ida a outra máquina. A regra é sobre
+  // rede: se fosse qualquer URL, um filtro de grão em SVG contaria como envio para fora do site.
+  const network = requests.filter(url => /^https?:/i.test(url));
+  const external = network.filter(url => !url.startsWith(BASE));
   check('Local: nenhuma requisição fora do site', external.length === 0, external.slice(0, 3).join(' '));
-  check('Local: o histórico nunca foi enviado', !requests.some(url => /journal|history/i.test(url)));
+  check('Local: o histórico nunca foi enviado', !network.some(url => /journal|history/i.test(url)));
 
   console.log(failures ? `\n${failures} verificacao(oes) falharam.` : '\nRetencao: fade suave do temporizador, perguntas do dia com historico local e sugestao por periodo verificados no navegador.');
 } finally {
