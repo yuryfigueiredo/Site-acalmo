@@ -28,7 +28,8 @@ assert.ok(home.includes('Como participante do Programa de Associados da Amazon')
 // com texto alternativo, e as ferramentas e leituras têm de usar o próprio cartão.
 // A 404 fica fora: ninguém compartilha uma página de erro.
 const indexable = await Promise.all(files.filter(f => f.endsWith('.html') && !f.endsWith('404.html')).map(async f => [f, await readFile(f, 'utf8')]));
-let cards = 0;
+let cards = 0, readings = 0;
+const ORIGIN = 'https://www.acalmo.com.br';
 for (const [file, text] of indexable) {
   const image = text.match(/<meta property="og:image" content="([^"]*)"/)?.[1];
   assert.ok(image, file + ' precisa de og:image');
@@ -37,9 +38,38 @@ for (const [file, text] of indexable) {
   assert.ok(text.match(/<meta property="og:image:alt" content="[^"]{12,}"/), file + ' precisa de og:image:alt descritivo');
   const own = path.basename(image) !== 'og-cover.jpg';
   if (own) cards++;
-  if (/^https:\/\/www\.acalmo\.com\.br\/(sons|respiracao|foco|leituras)\//.test(text.match(/<meta property="og:url" content="([^"]*)"/)?.[1] || '')) {
+  const url = text.match(/<meta property="og:url" content="([^"]*)"/)?.[1] || '';
+  if (/^https:\/\/www\.acalmo\.com\.br\/(sons|respiracao|foco|leituras)\//.test(url)) {
     assert.ok(own, file + ' deveria apontar para um cartão próprio, não para a capa do site');
   }
+  // O feed só traz leituras, então só o hub e os textos podem anunciá-lo como alternativa.
+  const article = /"@type":"Article"/.test(text);
+  if (article || url === ORIGIN + '/blog/') {
+    assert.ok(text.includes(`<link rel="alternate" type="application/atom+xml" title="Acalmo — Leituras para desacelerar" href="${ORIGIN}/feed.xml">`), file + ' deveria anunciar o feed Atom no <head>');
+  }
+  if (article) readings++;
 }
 assert.equal(cards, 8, 'a espera eram 8 cartões próprios');
-console.log(`${pages} páginas e ${modules} módulos verificados: sintaxe, recursos, IDs, metadados básicos, manifesto, tag Amazon e ${cards} cartões de compartilhamento.`);
+
+// Feed Atom: o leitor não executa nada do site, então cada endereço precisa sair absoluto e
+// cada entrada precisa ter o mínimo para abrir sozinha (título, link, id e data).
+const feed = await readFile(path.join(root, 'feed.xml'), 'utf8');
+assert.ok(feed.startsWith('<?xml version="1.0" encoding="UTF-8"?>'), 'feed.xml precisa começar pela declaração xml');
+assert.ok(feed.includes('xmlns="http://www.w3.org/2005/Atom"'), 'feed.xml não está no namespace do Atom');
+assert.equal((feed.match(/<entry>/g) || []).length, readings, `o feed tem outra quantidade de entradas para ${readings} leituras indexáveis`);
+for (const entry of feed.matchAll(/<entry>([\s\S]*?)<\/entry>/g)) {
+  assert.ok(/<title>[^<]{4,}<\/title>/.test(entry[1]), 'entrada do feed sem título');
+  assert.ok(/<link href="https:\/\/www\.acalmo\.com\.br\/[^"]+"\/>/.test(entry[1]), 'entrada do feed sem link absoluto');
+  assert.ok(/<id>https:\/\/www\.acalmo\.com\.br\/[^<]+<\/id>/.test(entry[1]), 'entrada do feed sem id');
+  assert.ok(/<updated>\d{4}-\d{2}-\d{2}T/.test(entry[1]), 'entrada do feed sem data');
+}
+const resolved = feed.replaceAll('&quot;', '"').replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&');
+assert.ok(!/(?:href|src)="\/(?!\/)/.test(resolved), 'o feed deixou um caminho relativo: dentro do leitor isso vira link quebrado');
+assert.ok(!/href="https?:\/\/[^"]*\.html"/.test(resolved), 'o feed aponta para um arquivo .html em vez de uma rota');
+
+// IndexNow: a chave é pública e mora no raiz do site com o próprio nome — é assim que o serviço
+// prova que quem avisou controla o domínio.
+const keys = files.filter(f => /^[0-9a-f]{32}\.txt$/.test(path.basename(f)));
+assert.equal(keys.length, 1, 'precisa de exatamente uma chave IndexNow no raiz do site');
+assert.equal((await readFile(keys[0], 'utf8')).trim(), path.basename(keys[0], '.txt'), 'o arquivo da chave IndexNow precisa conter a própria chave');
+console.log(`${pages} páginas e ${modules} módulos verificados: sintaxe, recursos, IDs, metadados básicos, manifesto, tag Amazon, ${cards} cartões de compartilhamento, feed Atom com ${readings} leituras e chave IndexNow.`);

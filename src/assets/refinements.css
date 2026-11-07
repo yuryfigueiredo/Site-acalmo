@@ -71,7 +71,7 @@
 .site-header .wordmark,.site-footer .wordmark{display:inline-flex;align-items:center;min-height:44px}
 
 /* As migalhas ficam no polegar: o texto continua pequeno, o alvo chega a 44px. */
-.breadcrumbs a{padding:14px 8px;margin-inline:-8px}
+.breadcrumbs a{padding:14px 9px;margin-inline:-9px}
 .breadcrumbs{margin-bottom:-8px}
 
 /* Ruídos contínuos: três interruptores discretos, sem o peso de um card inteiro. */

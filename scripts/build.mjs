@@ -31,7 +31,7 @@ for(const file of files){
 }
 // Share cards are only ever requested by social-network crawlers, which never run this
 // service worker — precaching them would cost every visitor ~480 KB of mobile data for nothing.
-const precache=files.filter(file=>!['/_headers','/robots.txt','/sitemap.xml','/404.html'].includes(file)&&!/^\/assets\/og-[a-z0-9-]+\.jpg$/.test(file)).map(file=>file.endsWith('/index.html')?file.slice(0,-10):file);
+const precache=files.filter(file=>!['/_headers','/robots.txt','/sitemap.xml','/feed.xml','/404.html'].includes(file)&&!/^\/assets\/og-[a-z0-9-]+\.jpg$/.test(file)).map(file=>file.endsWith('/index.html')?file.slice(0,-10):file);
 const worker=(await readFile(path.join(root,'src/sw.js'),'utf8')).replace('__BUILD_HASH__',releaseHash).replace('__PRECACHE_FILES__',JSON.stringify(precache));
 await writeFile(path.join(root,'dist/sw.js'),worker);
 console.log('Site estático preparado em dist/.');

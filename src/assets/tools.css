@@ -1,23 +1,29 @@
 /* Tool pages: one fullscreen scene per intent, chrome that rests, editorial below. */
 .tool-stage{position:relative;min-height:100svh;display:grid;place-items:center;overflow:hidden;isolation:isolate;padding:96px 20px 64px}
-.tool-scene{position:absolute;inset:0;z-index:-1;background:var(--surface);overflow:hidden}
+.tool-scene{position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,var(--surface) 62%,var(--paper));overflow:hidden}
 .tool-scene::before,.tool-scene::after{content:"";position:absolute;inset:-20%;pointer-events:none}
-.tool-scene::before{background:radial-gradient(circle at 32% 24%,var(--glow-a),transparent 62%);animation:tool-drift 26s ease-in-out infinite alternate}
-.tool-scene::after{background:radial-gradient(circle at 74% 78%,var(--glow-b),transparent 58%);animation:tool-drift 32s ease-in-out infinite alternate-reverse}
-.scene-brown{--glow-a:rgba(122,92,60,.40);--glow-b:rgba(64,46,30,.42)}
-.scene-rain{--glow-a:rgba(126,146,140,.42);--glow-b:rgba(70,92,88,.40)}
-.scene-rain::after{background:repeating-linear-gradient(102deg,transparent 0 26px,rgba(255,255,255,.10) 26px 27px,transparent 27px 60px);animation:tool-rain 1.6s linear infinite}
-.scene-box{--glow-a:rgba(148,173,136,.40);--glow-b:rgba(84,110,86,.36)}
+.tool-scene::before{background:radial-gradient(circle at 18% 12%,var(--glow-a),transparent 52%);animation:tool-drift 26s ease-in-out infinite alternate}
+.tool-scene::after{background:radial-gradient(circle at 84% 90%,var(--glow-b),transparent 50%);animation:tool-drift 32s ease-in-out infinite alternate-reverse}
+.scene-brown{--glow-a:#d1a25566;--glow-a:oklch(74% .11 78/.40);--glow-b:#633e1d61;--glow-b:oklch(40% .07 60/.38)}
+.scene-rain{--glow-a:#5ab3c873;--glow-a:oklch(72% .09 215/.45);--glow-b:#13486266;--glow-b:oklch(38% .07 235/.40)}
+.scene-rain::after{background:repeating-linear-gradient(102deg,transparent 0 26px,rgba(19,72,98,.10) 26px 27px,transparent 27px 60px);animation:tool-rain 1.6s linear infinite}
+:root[data-theme=dark] .scene-rain::after{background:repeating-linear-gradient(102deg,transparent 0 26px,rgba(214,238,242,.16) 26px 27px,transparent 27px 60px)}
+.scene-box{--glow-a:#85cfbb66;--glow-a:oklch(80% .08 175/.40);--glow-b:#00535357;--glow-b:oklch(40% .07 195/.34)}
 .scene-box::after{inset:0;margin:auto;width:min(52vmin,340px);height:min(52vmin,340px);border:1px solid var(--line);border-radius:14px;background:none;animation:tool-box 16s ease-in-out infinite}
-.scene-478{--glow-a:rgba(96,116,132,.38);--glow-b:rgba(58,74,86,.40)}
+.scene-478{--glow-a:#6fc1c566;--glow-a:oklch(76% .08 200/.40);--glow-b:#10435561;--glow-b:oklch(36% .06 225/.38)}
 .scene-478::before{animation:tool-swell 19s ease-in-out infinite}
-.scene-focus{--glow-a:rgba(160,140,92,.34);--glow-b:rgba(110,96,60,.32)}
+.scene-focus{--glow-a:#d2bd7061;--glow-a:oklch(80% .10 95/.38);--glow-b:#6f521c52;--glow-b:oklch(46% .08 80/.32)}
 .scene-focus::after{inset:0;margin:auto;width:min(64vmin,420px);height:min(64vmin,420px);border-radius:50%;border:1px solid var(--line);background:none;animation:tool-ring 12s ease-in-out infinite}
-:root[data-theme=dark] .scene-brown{--glow-a:rgba(122,92,60,.26);--glow-b:rgba(20,14,8,.5)}
-:root[data-theme=dark] .scene-rain{--glow-a:rgba(126,146,140,.22);--glow-b:rgba(16,26,24,.5)}
-:root[data-theme=dark] .scene-box{--glow-a:rgba(148,173,136,.20);--glow-b:rgba(14,24,16,.5)}
-:root[data-theme=dark] .scene-478{--glow-a:rgba(96,116,132,.22);--glow-b:rgba(12,18,24,.5)}
-:root[data-theme=dark] .scene-focus{--glow-a:rgba(160,140,92,.20);--glow-b:rgba(24,20,10,.5)}
+/* Na página a moldura é da esfera, não da tela: centrada no viewport ela cortava as linhas de
+   texto no desktop. O cartão de compartilhamento continua com a geometria grande da cena. */
+.tool-stage .scene-box::after,.tool-stage .scene-focus::after{content:none}
+body[data-pattern=quadrada] .tool-orb-wrap{position:relative;margin-block:14px}
+body[data-pattern=quadrada] .tool-orb-wrap::after{content:"";position:absolute;inset:-26px;border:1px solid var(--line);border-radius:14px;animation:tool-box 16s ease-in-out infinite;pointer-events:none}
+:root[data-theme=dark] .scene-brown{--glow-a:#6d4f1942;--glow-a:oklch(45% .08 78/.26);--glow-b:#23110380;--glow-b:oklch(20% .04 60/.5)}
+:root[data-theme=dark] .scene-rain{--glow-a:#416a7738;--glow-a:oklch(50% .05 220/.22);--glow-b:#000f1c80;--glow-b:oklch(16% .04 240/.5)}
+:root[data-theme=dark] .scene-box{--glow-a:#3f746a33;--glow-a:oklch(52% .06 180/.20);--glow-b:#00141580;--glow-b:oklch(17% .04 195/.5)}
+:root[data-theme=dark] .scene-478{--glow-a:#39666b38;--glow-a:oklch(48% .05 205/.22);--glow-b:#000e1880;--glow-b:oklch(15% .04 225/.5)}
+:root[data-theme=dark] .scene-focus{--glow-a:#72632833;--glow-a:oklch(50% .08 95/.20);--glow-b:#1b0f0080;--glow-b:oklch(18% .04 80/.5)}
 @keyframes tool-drift{from{transform:translate3d(-3%,-2%,0) scale(1)}to{transform:translate3d(3%,3%,0) scale(1.08)}}
 @keyframes tool-rain{from{transform:translate3d(0,-60px,0)}to{transform:translate3d(-12px,0,0)}}
 @keyframes tool-box{0%,100%{transform:scale(.86);opacity:.5}25%{transform:scale(1);opacity:.9}50%{transform:scale(1);opacity:.9}75%{transform:scale(.86);opacity:.5}}
@@ -29,7 +35,10 @@
 .tool-header-actions{display:flex;align-items:center;gap:8px}
 .tool-header .text-button{min-height:44px}
 .tool-widget{position:relative;z-index:1;display:grid;justify-items:center;gap:18px;text-align:center;max-width:560px}
-.tool-kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+/* A luz da cena cai mais suave no centro, onde se lê. Os raios ficam dentro da caixa (46% e 40% de
+   uma caixa com respiro), senão o degradê morre no meio e a borda da caixa vira um retângulo visível. */
+.tool-widget::before{content:"";position:absolute;z-index:-1;inset:-120px -300px;background:radial-gradient(46% 40% at 50% 46%,var(--paper) 0 58%,transparent 100%);opacity:.55;pointer-events:none}
+.tool-kicker{font-size:14px;font-weight:600;letter-spacing:.01em;color:var(--muted)}
 .tool-name{font-family:var(--serif);font-size:clamp(30px,6vw,46px);line-height:1.15;color:var(--ink);margin:0}
 .tool-sub{color:var(--body);max-width:44ch;margin:0}
 .tool-controls{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;transition:opacity .5s}
@@ -45,15 +54,15 @@
 .tool-select select{min-height:44px;padding:8px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:14px}
 .tool-status{min-height:22px;font-size:13px;color:var(--muted)}
 .tool-orb-wrap{display:grid;place-items:center;width:220px;height:220px}
-.tool-orb{width:168px;height:168px;border-radius:50%;background:radial-gradient(circle at 30% 25%,#e4ecd4 0%,#c4d2b3 34%,#94ad88 70%,#6d8a69);box-shadow:0 20px 40px #2f4d2520;display:grid;place-items:center;will-change:transform}
-:root[data-theme=dark] .tool-orb{background:radial-gradient(circle at 30% 25%,#4a6547 0%,#3a5238 40%,#2b4029 75%,#22331f)}
+.tool-orb{width:168px;height:168px;border-radius:50%;background:radial-gradient(circle at 30% 25%,#d9ecec 0%,#afd5d5 34%,#77b1b2 70%,#4d8c8f);box-shadow:0 20px 40px #091e3220;display:grid;place-items:center;will-change:transform}
+:root[data-theme=dark] .tool-orb{background:radial-gradient(circle at 30% 25%,#2e535c 0%,#193e47 40%,#0c2b34 75%,#061e27)}
 .tool-orb-inner{display:grid;gap:2px;place-items:center;color:var(--breath-ink)}
 .tool-phase{font-size:15px}
 .tool-count{font-family:var(--serif);font-size:34px;line-height:1}
 .tool-cycle{font-size:13px;color:var(--muted);min-height:20px}
-.tool-clock{font-family:var(--serif);font-size:clamp(56px,14vw,96px);line-height:1;color:var(--ink);font-variant-numeric:tabular-nums}
+.tool-clock{font-family:var(--serif);font-size:clamp(56px,14vw,96px);line-height:1;margin-bottom:0;color:var(--ink);font-variant-numeric:tabular-nums}
 .tool-hint{position:absolute;bottom:18px;left:0;right:0;z-index:1;text-align:center;font-size:12px;color:var(--muted);transition:opacity .5s}
-.tool-hint a{color:inherit;display:inline-flex;align-items:center;min-height:44px}
+.tool-hint a{color:inherit;display:inline-flex;align-items:center;min-height:44px;padding:0 18px;border-radius:99px;background:var(--card)}
 body.tool-idle .tool-header,body.tool-idle .tool-hint{opacity:0;pointer-events:none}
 body.tool-idle .tool-controls{opacity:.4}
 .tool-reading{background:var(--paper);position:relative;z-index:1;padding:56px 20px 72px}
@@ -70,5 +79,5 @@ body.tool-idle .tool-controls{opacity:.4}
 .tool-related .small-label{margin:0}
 .tool-related h2{font-family:var(--serif);font-size:18px;margin:0;color:var(--ink)}
 .tool-related span.text-link{min-height:0;margin:0}
-@media (prefers-reduced-motion:reduce){.tool-scene::before,.tool-scene::after{animation:none}.tool-orb{transform:none!important}}
+@media (prefers-reduced-motion:reduce){.tool-scene::before,.tool-scene::after{animation:none}.tool-orb{transform:none!important}body[data-pattern=quadrada] .tool-orb-wrap::after{animation:none}}
 @media (max-width:600px){.tool-header .tool-theme-label{display:none}.tool-stage{padding:84px 16px 56px}}

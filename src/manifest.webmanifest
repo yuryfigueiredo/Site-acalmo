@@ -6,8 +6,8 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f5f2e9",
-  "theme_color": "#344f40",
+  "background_color": "#eef5f0",
+  "theme_color": "#00545b",
   "description": "Respiração, sons e pequenos rituais para desacelerar.",
   "icons": [
     {

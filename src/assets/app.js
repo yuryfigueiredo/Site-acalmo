@@ -56,7 +56,7 @@ if (menuOpen) { const menuDialog = $('#menu-dialog'); menuOpen.addEventListener(
 
 // Theme choice is local; no server-side profile is needed.
 const themeButton = $('#theme-toggle');
-function renderTheme() { const dark = document.documentElement.dataset.theme === 'dark'; themeButton.setAttribute('aria-pressed', String(dark)); themeButton.setAttribute('aria-label', dark ? 'Ativar modo claro' : 'Ativar modo noturno'); themeButton.innerHTML = icon(dark ? 'sun' : 'moon'); $('meta[name="theme-color"]').content = dark ? '#172a24' : '#f5f2e9'; }
+function renderTheme() { const dark = document.documentElement.dataset.theme === 'dark'; themeButton.setAttribute('aria-pressed', String(dark)); themeButton.setAttribute('aria-label', dark ? 'Ativar modo claro' : 'Ativar modo noturno'); themeButton.innerHTML = icon(dark ? 'sun' : 'moon'); $('meta[name="theme-color"]').content = dark ? '#091e32' : '#eef5f0'; }
 themeButton.addEventListener('click', () => { const dark = document.documentElement.dataset.theme !== 'dark'; document.documentElement.dataset.theme = dark ? 'dark' : 'light'; try { local?.setItem('acalmo:theme', dark ? 'dark' : 'light'); } catch { /* Theme still works for this visit. */ } renderTheme(); });
 renderTheme();
 $('#year').textContent = new Date().getFullYear();
@@ -352,15 +352,15 @@ let quoteDate = new Date().toDateString();
 setInterval(() => { if (quoteDate !== new Date().toDateString()) { quoteDate = new Date().toDateString(); todayQuote = dailyQuote(); $('#daily-quote').textContent = todayQuote; renderQuoteSave(); } }, 60000);
 async function quoteImage() {
   const canvas = document.createElement('canvas'); canvas.width = 1080; canvas.height = 1080;
-  const ctx = canvas.getContext('2d'); ctx.fillStyle = '#eae9dc'; ctx.fillRect(0, 0, 1080, 1080);
+  const ctx = canvas.getContext('2d'); ctx.fillStyle = '#eef5f0'; ctx.fillRect(0, 0, 1080, 1080);
   if (landscape.complete && landscape.naturalWidth) { ctx.save(); ctx.globalAlpha = .18; ctx.drawImage(landscape, 0, 330, 1080, 750); ctx.restore(); }
-  ctx.strokeStyle = '#7d937b40'; ctx.lineWidth = 2;
+  ctx.strokeStyle = '#00545b40'; ctx.lineWidth = 2;
   for (let i = 0; i < 8; i++) { ctx.beginPath(); ctx.ellipse(920, 900, 200 + i * 40, 100 + i * 24, -.3, 0, Math.PI * 2); ctx.stroke(); }
-  ctx.fillStyle = '#344b3f'; ctx.textAlign = 'center'; ctx.font = '28px Arial'; ctx.fillText('Uma frase para hoje', 540, 200);
+  ctx.fillStyle = '#00545b'; ctx.textAlign = 'center'; ctx.font = '28px "Karla", Arial'; ctx.fillText('Uma frase para hoje', 540, 200);
   ctx.font = '58px Georgia'; const words = todayQuote.split(' '), lines = []; let line = '';
   words.forEach(word => { const test = line ? line + ' ' + word : word; if (ctx.measureText(test).width > 850 && line) { lines.push(line); line = word; } else line = test; }); if (line) lines.push(line);
   const start = 490 - (lines.length - 1) * 39; lines.forEach((line, i) => ctx.fillText(line, 540, start + i * 78));
-  ctx.font = '46px Georgia'; ctx.fillText('acalmo.', 540, 850); ctx.font = '23px Arial'; ctx.fillText('Um lugar para desacelerar.', 540, 904);
+  ctx.font = '46px Georgia'; ctx.fillText('acalmo.', 540, 850); ctx.font = '23px "Karla", Arial'; ctx.fillText('Um lugar para desacelerar.', 540, 904);
   return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('image unavailable')), 'image/png'));
 }
 $('#quote-image').addEventListener('click', async () => { try { const blob = await quoteImage(); download(blob, 'uma-frase-acalmo.png'); $('#quote-status').textContent = 'Imagem preparada para salvar e compartilhar.'; } catch { $('#quote-status').textContent = 'Não foi possível preparar a imagem. Você ainda pode compartilhar a frase em texto.'; } });
