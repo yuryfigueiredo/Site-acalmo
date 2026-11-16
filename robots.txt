@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://acalmo.com.br/sitemap.xml
+Sitemap: https://www.acalmo.com.br/sitemap.xml
